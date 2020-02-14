@@ -157,7 +157,7 @@ getData =
             Json.Decode.list dataDecoder
 
         url =
-            apiServer ++ "/csm"
+            apiServer ++ "/data/csm"
 
         _ =
             Debug.log ("url = " ++ url)
