@@ -1,17 +1,21 @@
 module Page.CSM exposing (Model, Msg, init, update, view)
 
 import Config exposing (apiServer)
-import Html exposing (Html, div, h1, h2, p, table, td, text, th, tr)
+import Html exposing (Html, div, h1, h2, input, p, table, td, text, th, tr)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Json.Decode exposing (Decoder, field, float, int, nullable, string)
 import Json.Decode.Pipeline exposing (hardcoded, optional, required)
 import RemoteData exposing (RemoteData, WebData)
+import Table
 
 
 type alias Model =
-    { records : WebData (List Record) }
+    { records : WebData (List Record)
+    , tableState : Table.State
+    , query : String
+    }
 
 
 type alias Record =
@@ -25,11 +29,18 @@ type alias Record =
 type Msg
     = MakeRequest
     | DataResponse (WebData (List Record))
+    | SetQuery String
+    | SetTableState Table.State
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { records = RemoteData.Loading }, getData )
+    ( { records = RemoteData.Loading
+      , tableState = Table.initialSort "Year"
+      , query = ""
+      }
+    , getData
+    )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -40,6 +51,16 @@ update msg model =
 
         DataResponse data ->
             ( { model | records = data }
+            , Cmd.none
+            )
+
+        SetQuery newQuery ->
+            ( { model | query = newQuery }
+            , Cmd.none
+            )
+
+        SetTableState newState ->
+            ( { model | tableState = newState }
             , Cmd.none
             )
 
@@ -62,7 +83,7 @@ viewData model =
             div [] [ text "Loading data..." ]
 
         RemoteData.Failure httpError ->
-            div [] [ text (buildErrorMessage httpError) ]
+            div [] [ text (viewHttpErrorMessage httpError) ]
 
         RemoteData.Success data ->
             let
@@ -82,8 +103,21 @@ viewData model =
                         , th [] [ text "Station" ]
                         , th [] [ text "Value" ]
                         ]
+
+                lowerQuery =
+                    String.toLower model.query
+
+                filtered =
+                    List.filter (String.contains lowerQuery << String.toLower << .measurement) data
             in
-            table [] ([ header ] ++ List.map viewRec data)
+            div []
+                [ input [ placeholder "Search by Name", onInput SetQuery ] []
+                , Table.view tblConfig model.tableState filtered
+                ]
+
+
+
+-- table [] ([ header ] ++ List.map viewRec filtered)
 
 
 getData : Cmd Msg
@@ -104,8 +138,8 @@ getData =
         }
 
 
-buildErrorMessage : Http.Error -> String
-buildErrorMessage httpError =
+viewHttpErrorMessage : Http.Error -> String
+viewHttpErrorMessage httpError =
     case httpError of
         Http.BadUrl message ->
             message
@@ -121,6 +155,20 @@ buildErrorMessage httpError =
 
         Http.BadBody message ->
             message
+
+
+tblConfig : Table.Config Record Msg
+tblConfig =
+    Table.config
+        { toId = .station
+        , toMsg = SetTableState
+        , columns =
+            [ Table.stringColumn "Collected" .collection_date
+            , Table.stringColumn "Measurement" .measurement
+            , Table.stringColumn "Station" .station
+            , Table.floatColumn "Value" .val
+            ]
+        }
 
 
 dataDecoder : Decoder Record
