@@ -1,2 +1,2 @@
 js:
-	elm make --output=main.js src/Main.elm
+	elm make --output=index.js src/Main.elm

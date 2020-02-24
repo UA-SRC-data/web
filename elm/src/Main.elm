@@ -1,55 +1,56 @@
-module Main exposing (Model(..), Msg(..), dataDecoder, getData, init, main, subscriptions, update, view, viewData)
-
---import HttpBuilder
+module Main exposing (Model, Msg(..), init, main, subscriptions, update, view)
 
 import Browser
+import Browser.Navigation as Nav
 import Debug
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (..)
-import Http
-import Json.Decode exposing (Decoder, field, float, int, nullable, string)
-import Json.Decode.Pipeline exposing (hardcoded, optional, required)
+import Page.CSM
+import Page.Home
+import PageView
+import Route exposing (Route)
+import Url
 
 
 
 -- MAIN
 
 
-apiServer =
-    "http://127.0.0.1:8000"
-
-
+main : Program () Model Msg
 main =
-    Browser.element
+    Browser.application
         { init = init
+        , view = view
         , update = update
         , subscriptions = subscriptions
-        , view = view
+        , onUrlChange = UrlChanged
+        , onUrlRequest = LinkClicked
         }
-
-
-type alias Record =
-    { collection_date : String
-    , measurement : String
-    , station : String
-    , val : Float
-    }
 
 
 
 -- MODEL
 
 
-type Model
-    = Failure String
-    | Loading
-    | Success (List Record)
+type Page
+    = Home
+    | CSM Page.CSM.Model
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( Loading, getData )
+
+-- | CSM Page.CSM.Model
+
+
+type alias Model =
+    { key : Nav.Key
+    , url : Url.Url
+    , cur_page : Page
+    }
+
+
+init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init _ url key =
+    ( Model key url Home, Cmd.none )
 
 
 
@@ -57,41 +58,50 @@ init _ =
 
 
 type Msg
-    = MorePlease
-    | GotData (Result Http.Error (List Record))
+    = LinkClicked Browser.UrlRequest
+    | UrlChanged Url.Url
+    | CSMMsg Page.CSM.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        MorePlease ->
-            ( Loading, getData )
+    case ( msg, model.cur_page ) of
+        ( LinkClicked urlRequest, _ ) ->
+            case urlRequest of
+                Browser.Internal url ->
+                    ( model
+                    , Nav.pushUrl model.key (Url.toString url)
+                    )
 
-        GotData result ->
-            case result of
-                Ok data ->
-                    ( Success data, Cmd.none )
+                Browser.External href ->
+                    ( model, Nav.load href )
 
-                Err err ->
-                    let
-                        text =
-                            case err of
-                                Http.BadUrl m ->
-                                    "Bad URL: " ++ m
+        ( UrlChanged url, _ ) ->
+            changeRouteTo (Route.fromUrl url) model
 
-                                Http.Timeout ->
-                                    "Timeout"
+        ( CSMMsg subMsg, CSM subModel ) ->
+            let
+                ( newSubModel, newCmd ) =
+                    Page.CSM.update subMsg subModel
+            in
+            ( { model | cur_page = CSM newSubModel }, Cmd.map CSMMsg newCmd )
 
-                                Http.NetworkError ->
-                                    "Network Error"
+        ( _, _ ) ->
+            ( model, Cmd.none )
 
-                                Http.BadStatus _ ->
-                                    "Bad status"
 
-                                Http.BadBody body ->
-                                    "Bad body: " ++ body
-                    in
-                    ( Failure text, Cmd.none )
+changeRouteTo : Maybe Route -> Model -> ( Model, Cmd Msg )
+changeRouteTo maybeRoute model =
+    case maybeRoute of
+        Just Route.CSM ->
+            let
+                ( subModel, subMsg ) =
+                    Page.CSM.init
+            in
+            ( { model | cur_page = CSM subModel }, Cmd.map CSMMsg subMsg )
+
+        _ ->
+            ( { model | cur_page = Home }, Cmd.none )
 
 
 
@@ -99,7 +109,7 @@ update msg model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
+subscriptions _ =
     Sub.none
 
 
@@ -107,71 +117,16 @@ subscriptions model =
 -- VIEW
 
 
-view : Model -> Html Msg
+view : Model -> Browser.Document Msg
 view model =
-    div []
-        [ h2 [] [ text "SRC Data" ]
-        , viewData model
-        ]
+    case model.cur_page of
+        Home ->
+            PageView.view Page.Home.view
 
-
-viewData : Model -> Html Msg
-viewData model =
-    case model of
-        Failure err ->
-            div [] [ text ("Unable to data: " ++ err) ]
-
-        Loading ->
-            text "Loading..."
-
-        Success data ->
-            let
-                viewRec rec =
-                    tr []
-                        [ td [] [ text rec.collection_date ]
-                        , td [] [ text rec.measurement ]
-                        , td [] [ text rec.station ]
-                        , td [ style "text-align" "right" ]
-                            [ text (String.fromFloat rec.val) ]
-                        ]
-
-                header =
-                    tr []
-                        [ th [] [ text "Collected" ]
-                        , th [] [ text "Measurement" ]
-                        , th [] [ text "Station" ]
-                        , th [] [ text "Value" ]
-                        ]
-            in
-            table [] ([ header ] ++ List.map viewRec data)
+        CSM subModel ->
+            PageView.view (Html.map CSMMsg (Page.CSM.view subModel))
 
 
 
--- HTTP
-
-
-getData : Cmd Msg
-getData =
-    let
-        decoder =
-            Json.Decode.list dataDecoder
-
-        url =
-            apiServer ++ "/data/csm"
-
-        _ =
-            Debug.log ("url = " ++ url)
-    in
-    Http.get
-        { url = url
-        , expect = Http.expectJson GotData decoder
-        }
-
-
-dataDecoder : Decoder Record
-dataDecoder =
-    Json.Decode.succeed Record
-        |> required "collection_date" string
-        |> required "measurement" string
-        |> required "station" string
-        |> required "val" float
+--CSM subModel ->
+--    PageView.view (Page.CSM.view subModel)
