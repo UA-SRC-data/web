@@ -4,7 +4,8 @@
   "description": "UA SRC Elm SPA",
   "main": "index.js",
   "scripts": {
-    "start": "parcel index.html",
+    "start": "elm-live src/Main.elm --port 8080 --start-page=index.html -- --output=index.js", 
+    "start_parcel": "parcel index.html",
     "build": "parcel build index.html",
     "test": "elm-test"
   },

@@ -29,11 +29,13 @@ def read_root():
 
 
 # --------------------------------------------------
-@app.get('/data/csm_measurements')
+@app.get('/data/csm/measurements')
 def csm_measurements():
     """List CSM measurements"""
 
-    return sorted(db['csm'].distinct('measurement'))
+    return list(
+        map(lambda m: {'measurement': m},
+            sorted(db['csm'].distinct('measurement'))))
 
 
 # --------------------------------------------------
@@ -49,6 +51,7 @@ def csm(measurement: str = '',
     coll = db['csm']
 
     qry = {}
+    prj = {'station': 1, 'measurement': 1, 'collection_date': 1, 'val': 1}
 
     if measurement:
         qry['measurement'] = measurement
@@ -73,7 +76,7 @@ def csm(measurement: str = '',
         qry['val'] = {'$gte': val_min}
 
     f = lambda rec: {k: rec[k] for k in rec if k != '_id'}
-    return list(map(f, coll.find(qry)))
+    return list(map(f, coll.find(qry, prj)))
 
 
 # --------------------------------------------------

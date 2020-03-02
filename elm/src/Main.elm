@@ -1,5 +1,6 @@
 module Main exposing (Model, Msg(..), init, main, subscriptions, update, view)
 
+import Bootstrap.Navbar as Navbar
 import Browser
 import Browser.Navigation as Nav
 import Debug
@@ -37,20 +38,21 @@ type Page
     | CSM Page.CSM.Model
 
 
-
--- | CSM Page.CSM.Model
-
-
 type alias Model =
     { key : Nav.Key
     , url : Url.Url
     , cur_page : Page
+    , navbarState : Navbar.State
     }
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
-    ( Model key url Home, Cmd.none )
+    let
+        ( navbarState, navbarCmd ) =
+            Navbar.initialState NavbarMsg
+    in
+    ( Model key url Home navbarState, navbarCmd )
 
 
 
@@ -59,6 +61,7 @@ init _ url key =
 
 type Msg
     = LinkClicked Browser.UrlRequest
+    | NavbarMsg Navbar.State
     | UrlChanged Url.Url
     | CSMMsg Page.CSM.Msg
 
@@ -78,6 +81,9 @@ update msg model =
 
         ( UrlChanged url, _ ) ->
             changeRouteTo (Route.fromUrl url) model
+
+        ( NavbarMsg state, _ ) ->
+            ( { model | navbarState = state }, Cmd.none )
 
         ( CSMMsg subMsg, CSM subModel ) ->
             let
@@ -119,14 +125,13 @@ subscriptions _ =
 
 view : Model -> Browser.Document Msg
 view model =
+    let
+        navConfig =
+            Navbar.config NavbarMsg
+    in
     case model.cur_page of
         Home ->
-            PageView.view Page.Home.view
+            PageView.view navConfig model.navbarState Page.Home.view
 
         CSM subModel ->
-            PageView.view (Html.map CSMMsg (Page.CSM.view subModel))
-
-
-
---CSM subModel ->
---    PageView.view (Page.CSM.view subModel)
+            PageView.view navConfig model.navbarState (Html.map CSMMsg (Page.CSM.view subModel))

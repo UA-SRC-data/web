@@ -1,26 +1,38 @@
 module PageView exposing (view)
 
+--import Element exposing (..)
+--import Element.Background
+--import Element.Font
+
+import Bootstrap.Grid as Grid
+import Bootstrap.Navbar as Navbar
 import Browser exposing (Document)
-import Element exposing (..)
-import Element.Background
-import Element.Font
-import Html exposing (Html)
+import Html exposing (Html, a, div, text)
 import Route exposing (Route)
 
 
-view : Html msg -> Document msg
-view content =
+view : Navbar.Config msg -> Navbar.State -> Html msg -> Document msg
+view navConfig navbarState content =
     let
-        header =
-            Html.div []
-                [ Html.a [ Route.href Route.Home ] [ Html.text "Home" ]
-                , Html.text " | "
-                , Html.a [ Route.href Route.CSM ] [ Html.text "CSM" ]
-                ]
+        nav =
+            navConfig
+                |> Navbar.withAnimation
+                |> Navbar.brand [ Route.href Route.Home ] [ text "SRC" ]
+                |> Navbar.items
+                    [ Navbar.itemLink [ Route.href Route.CSM ] [ text "CSM" ]
+                    ]
+                |> Navbar.view navbarState
     in
     { title = "SRC Portal"
     , body =
-        [ header
-        , content
+        [ Grid.container []
+            [ Grid.row []
+                [ Grid.col
+                    []
+                    [ nav
+                    , content
+                    ]
+                ]
+            ]
         ]
     }

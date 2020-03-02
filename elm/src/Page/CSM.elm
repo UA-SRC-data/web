@@ -13,8 +13,14 @@ import Table
 
 type alias Model =
     { records : WebData (List Record)
+    , measurements : WebData (List Measurement)
     , tableState : Table.State
     , query : String
+    }
+
+
+type alias Measurement =
+    { measurement : String
     }
 
 
@@ -29,17 +35,19 @@ type alias Record =
 type Msg
     = MakeRequest
     | DataResponse (WebData (List Record))
+    | MeasurementResponse (WebData (List Measurement))
     | SetQuery String
     | SetTableState Table.State
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { records = RemoteData.Loading
+    ( { records = RemoteData.NotAsked
+      , measurements = RemoteData.Loading
       , tableState = Table.initialSort "Year"
       , query = ""
       }
-    , getData
+    , getMeasurements
     )
 
 
@@ -51,6 +59,11 @@ update msg model =
 
         DataResponse data ->
             ( { model | records = data }
+            , Cmd.none
+            )
+
+        MeasurementResponse data ->
+            ( { model | measurements = data }
             , Cmd.none
             )
 
@@ -68,7 +81,8 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ h2 [] [ text "SRC Data" ]
+        [ h2 [] [ text "Colorado School of Mines Data" ]
+        , viewMeasurements model.measurements
         , viewData model
         ]
 
@@ -116,26 +130,30 @@ viewData model =
                 ]
 
 
-
--- table [] ([ header ] ++ List.map viewRec filtered)
-
-
-getData : Cmd Msg
-getData =
+viewMeasurements : WebData (List Measurement) -> Html Msg
+viewMeasurements measurements =
     let
-        decoder =
-            Json.Decode.list dataDecoder
+        f m =
+            text m.measurement
 
-        url =
-            apiServer ++ "/data/csm"
+        body =
+            case measurements of
+                RemoteData.NotAsked ->
+                    div [] [ text "Not asked" ]
 
-        _ =
-            Debug.log ("url = " ++ url)
+                RemoteData.Loading ->
+                    div [] [ text "Loading" ]
+
+                RemoteData.Failure httpError ->
+                    div [] [ text (viewHttpErrorMessage httpError) ]
+
+                RemoteData.Success data ->
+                    div [] (List.map f data)
     in
-    Http.get
-        { url = url
-        , expect = Http.expectJson (RemoteData.fromResult >> DataResponse) (Json.Decode.list dataDecoder)
-        }
+    div []
+        [ text "Measurements"
+        , body
+        ]
 
 
 viewHttpErrorMessage : Http.Error -> String
@@ -155,6 +173,45 @@ viewHttpErrorMessage httpError =
 
         Http.BadBody message ->
             message
+
+
+getData : Cmd Msg
+getData =
+    let
+        decoder =
+            Json.Decode.list dataDecoder
+
+        url =
+            apiServer ++ "/data/csm"
+
+        _ =
+            Debug.log ("url = " ++ url)
+    in
+    Http.get
+        { url = url
+        , expect =
+            Http.expectJson
+                (RemoteData.fromResult >> DataResponse)
+                (Json.Decode.list dataDecoder)
+        }
+
+
+getMeasurements : Cmd Msg
+getMeasurements =
+    let
+        decoder =
+            Json.Decode.list measurementDecoder
+
+        url =
+            apiServer ++ "/data/csm/measurements"
+    in
+    Http.get
+        { url = url
+        , expect =
+            Http.expectJson
+                (RemoteData.fromResult >> MeasurementResponse)
+                (Json.Decode.list measurementDecoder)
+        }
 
 
 tblConfig : Table.Config Record Msg
@@ -178,3 +235,9 @@ dataDecoder =
         |> Json.Decode.Pipeline.required "measurement" string
         |> Json.Decode.Pipeline.required "station" string
         |> Json.Decode.Pipeline.required "val" float
+
+
+measurementDecoder : Decoder Measurement
+measurementDecoder =
+    Json.Decode.succeed Measurement
+        |> Json.Decode.Pipeline.required "measurement" string
