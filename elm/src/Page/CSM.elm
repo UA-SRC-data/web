@@ -2,29 +2,41 @@ module Page.CSM exposing (Model, Msg, init, subscriptions, update, view)
 
 import Bootstrap.Button as Button
 import Bootstrap.Form as Form
+import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Select as Select
 import Config exposing (apiServer)
 import Html exposing (Html, div, h1, h2, input, p, table, td, text, th, tr)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onInput)
 import Http
+import HttpBuilder
 import Json.Decode exposing (Decoder, field, float, int, nullable, string)
 import Json.Decode.Pipeline exposing (hardcoded, optional, required)
 import RemoteData exposing (RemoteData, WebData)
 import Table
+import Url.Builder
 
 
 type alias Model =
     { records : WebData (List Record)
     , measurements : WebData (List Measurement)
+    , stations : WebData (List Station)
     , tableState : Table.State
     , query : String
     , selectedMeasurement : Maybe String
+    , selectedStation : Maybe String
+    , minValue : Maybe Int
+    , maxValue : Maybe Int
     }
 
 
 type alias Measurement =
     { measurement : String
+    }
+
+
+type alias Station =
+    { station : String
     }
 
 
@@ -39,21 +51,30 @@ type alias Record =
 type Msg
     = MakeRequest
     | DataResponse (WebData (List Record))
-    | MeasurementResponse (WebData (List Measurement))
+    | MeasurementsResponse (WebData (List Measurement))
+    | StationsResponse (WebData (List Station))
     | SetQuery String
     | SetTableState Table.State
     | SelectMeasurement String
+    | SelectStation String
+    | SetMinValue String
+    | SetMaxValue String
 
 
 init : ( Model, Cmd Msg )
 init =
     ( { records = RemoteData.NotAsked
-      , measurements = RemoteData.Loading
+      , measurements = RemoteData.NotAsked
+      , stations = RemoteData.NotAsked
       , tableState = Table.initialSort "Year"
       , query = ""
       , selectedMeasurement = Nothing
+      , selectedStation = Nothing
+      , minValue = Nothing
+      , maxValue = Nothing
       }
-    , getMeasurements
+    , Cmd.batch
+        [ getMeasurements, getStations ]
     )
 
 
@@ -61,35 +82,52 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         MakeRequest ->
-            ( { model | records = RemoteData.Loading }, Cmd.none )
+            ( { model | records = RemoteData.Loading }, getData model )
 
         DataResponse data ->
             ( { model | records = data }
             , Cmd.none
             )
 
-        MeasurementResponse data ->
+        MeasurementsResponse data ->
             ( { model | measurements = data }
+            , Cmd.none
+            )
+
+        StationsResponse data ->
+            ( { model | stations = data }
             , Cmd.none
             )
 
         SelectMeasurement measurement ->
             let
-                ( newMeasurement, data ) =
+                newMeasurement =
                     case measurement of
                         "" ->
-                            ( Nothing, RemoteData.Loading )
+                            Nothing
 
                         _ ->
-                            ( Just measurement, RemoteData.Loading )
-
-                newModel =
-                    { model
-                        | selectedMeasurement = newMeasurement
-                        , records = data
-                    }
+                            Just measurement
             in
-            ( newModel, getData newModel )
+            ( { model | selectedMeasurement = newMeasurement }, Cmd.none )
+
+        SelectStation station ->
+            let
+                newStation =
+                    case station of
+                        "" ->
+                            Nothing
+
+                        _ ->
+                            Just station
+            in
+            ( { model | selectedStation = newStation }, Cmd.none )
+
+        SetMaxValue max ->
+            ( { model | maxValue = String.toInt max }, Cmd.none )
+
+        SetMinValue min ->
+            ( { model | minValue = String.toInt min }, Cmd.none )
 
         SetQuery newQuery ->
             ( { model | query = newQuery }
@@ -106,7 +144,7 @@ view : Model -> Html Msg
 view model =
     div []
         [ h2 [] [ text "Colorado School of Mines Data" ]
-        , viewMeasurements model
+        , viewForm model
         , viewData model
         ]
 
@@ -155,49 +193,101 @@ viewData model =
             in
             div []
                 [ text ("Showing " ++ String.fromInt (List.length data))
-                , input [ placeholder "Search by Name", onInput SetQuery ] []
                 , Table.view tblConfig model.tableState filtered
                 ]
 
 
-viewMeasurements : Model -> Html Msg
-viewMeasurements model =
-    let
-        f m =
-            text m.measurement
-
-        body =
-            case model.measurements of
-                RemoteData.NotAsked ->
-                    div [] [ text "Not asked" ]
-
-                RemoteData.Loading ->
-                    div [] [ text "Loading" ]
-
-                RemoteData.Failure httpError ->
-                    div [] [ text (viewHttpErrorMessage httpError) ]
-
-                RemoteData.Success data ->
-                    measurementsSelect data
-    in
-    Form.form [] [ body ]
-
-
-measurementsSelect : List Measurement -> Html Msg
-measurementsSelect measurements =
-    let
-        empty =
-            Measurement ""
-
-        makeItem item =
-            Select.item [ value item.measurement ] [ text item.measurement ]
-    in
-    Form.group []
-        [ Form.label [ for "measurement" ] [ text "Measurement" ]
-        , Select.select
-            [ Select.id "myselect", Select.onChange SelectMeasurement ]
-            (List.map makeItem ([ empty ] ++ measurements))
+viewForm : Model -> Html Msg
+viewForm model =
+    Form.form []
+        [ measurementsSelect model.measurements
+        , stationsSelect model.stations
+        , countMin
+        , countMax
+        , Button.button
+            [ Button.onClick MakeRequest
+            , Button.primary
+            ]
+            [ text "Submit" ]
         ]
+
+
+countMin : Html Msg
+countMin =
+    Form.group []
+        [ Form.label [ for "min_value" ] [ text "Min Value" ]
+        , Input.number [ Input.onInput SetMinValue ]
+        ]
+
+
+countMax : Html Msg
+countMax =
+    Form.group []
+        [ Form.label [ for "max_value" ] [ text "Max Value" ]
+        , Input.number [ Input.onInput SetMaxValue ]
+        ]
+
+
+measurementsSelect : WebData (List Measurement) -> Html Msg
+measurementsSelect measurements =
+    case measurements of
+        RemoteData.NotAsked ->
+            div [] [ text "Not asked" ]
+
+        RemoteData.Loading ->
+            div [] [ text "Loading" ]
+
+        RemoteData.Failure httpError ->
+            div [] [ text (viewHttpErrorMessage httpError) ]
+
+        RemoteData.Success data ->
+            let
+                empty =
+                    Measurement ""
+
+                makeItem item =
+                    Select.item
+                        [ value item.measurement ]
+                        [ text item.measurement ]
+            in
+            Form.group []
+                [ Form.label [ for "measurement" ] [ text "Measurement" ]
+                , Select.select
+                    [ Select.id "measurements"
+                    , Select.onChange SelectMeasurement
+                    ]
+                    (List.map makeItem ([ empty ] ++ data))
+                ]
+
+
+stationsSelect : WebData (List Station) -> Html Msg
+stationsSelect stations =
+    case stations of
+        RemoteData.NotAsked ->
+            div [] [ text "Not asked" ]
+
+        RemoteData.Loading ->
+            div [] [ text "Loading" ]
+
+        RemoteData.Failure httpError ->
+            div [] [ text (viewHttpErrorMessage httpError) ]
+
+        RemoteData.Success data ->
+            let
+                empty =
+                    Station ""
+
+                makeItem item =
+                    Select.item
+                        [ value item.station ]
+                        [ text item.station ]
+            in
+            Form.group []
+                [ Form.label [ for "station" ] [ text "Station" ]
+                , Select.select
+                    [ Select.id "stations", Select.onChange SelectStation ]
+                    (List.map makeItem ([ empty ] ++ data))
+                ]
 
 
 viewHttpErrorMessage : Http.Error -> String
@@ -222,35 +312,53 @@ viewHttpErrorMessage httpError =
 getData : Model -> Cmd Msg
 getData model =
     let
-        decoder =
-            Json.Decode.list dataDecoder
-
-        selectedParam =
-            case model.selectedMeasurement of
+        maybeToString m =
+            case m of
                 Nothing ->
                     ""
 
-                Just m ->
-                    "measurement=" ++ m
+                Just s ->
+                    s
+
+        maybeToInt m =
+            case m of
+                Nothing ->
+                    ""
+
+                Just n ->
+                    String.fromInt n
+
+        queryParams =
+            Url.Builder.toQuery
+                [ Url.Builder.string
+                    "measurement"
+                    (maybeToString model.selectedMeasurement)
+                , Url.Builder.string
+                    "station"
+                    (maybeToString model.selectedStation)
+                , Url.Builder.string
+                    "val_min"
+                    (maybeToInt model.minValue)
+                , Url.Builder.string
+                    "val_max"
+                    (maybeToInt model.maxValue)
+                ]
 
         url =
-            apiServer ++ "/data/csm?" ++ selectedParam
+            apiServer ++ "/data/csm" ++ queryParams
     in
-    Http.get
-        { url = url
-        , expect =
-            Http.expectJson
+    HttpBuilder.get url
+        |> HttpBuilder.withExpect
+            (Http.expectJson
                 (RemoteData.fromResult >> DataResponse)
-                (Json.Decode.list dataDecoder)
-        }
+                (Json.Decode.list decoderData)
+            )
+        |> HttpBuilder.request
 
 
 getMeasurements : Cmd Msg
 getMeasurements =
     let
-        decoder =
-            Json.Decode.list measurementDecoder
-
         url =
             apiServer ++ "/data/csm/measurements"
     in
@@ -258,8 +366,23 @@ getMeasurements =
         { url = url
         , expect =
             Http.expectJson
-                (RemoteData.fromResult >> MeasurementResponse)
-                (Json.Decode.list measurementDecoder)
+                (RemoteData.fromResult >> MeasurementsResponse)
+                (Json.Decode.list decoderMeasurement)
+        }
+
+
+getStations : Cmd Msg
+getStations =
+    let
+        url =
+            apiServer ++ "/data/csm/stations"
+    in
+    Http.get
+        { url = url
+        , expect =
+            Http.expectJson
+                (RemoteData.fromResult >> StationsResponse)
+                (Json.Decode.list decoderStation)
         }
 
 
@@ -277,8 +400,8 @@ tblConfig =
         }
 
 
-dataDecoder : Decoder Record
-dataDecoder =
+decoderData : Decoder Record
+decoderData =
     Json.Decode.succeed Record
         |> Json.Decode.Pipeline.required "collection_date" string
         |> Json.Decode.Pipeline.required "measurement" string
@@ -286,10 +409,16 @@ dataDecoder =
         |> Json.Decode.Pipeline.required "val" float
 
 
-measurementDecoder : Decoder Measurement
-measurementDecoder =
+decoderMeasurement : Decoder Measurement
+decoderMeasurement =
     Json.Decode.succeed Measurement
         |> Json.Decode.Pipeline.required "measurement" string
+
+
+decoderStation : Decoder Station
+decoderStation =
+    Json.Decode.succeed Station
+        |> Json.Decode.Pipeline.required "station" string
 
 
 subscriptions : Model -> Sub Msg

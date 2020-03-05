@@ -39,6 +39,15 @@ def csm_measurements():
 
 
 # --------------------------------------------------
+@app.get('/data/csm/stations')
+def csm_stations():
+    """List CSM stations"""
+
+    return list(
+        map(lambda s: {'station': s}, sorted(db['csm'].distinct('station'))))
+
+
+# --------------------------------------------------
 @app.get('/data/csm')
 def csm(measurement: str = '',
         station: str = '',
