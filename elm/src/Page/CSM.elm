@@ -1,9 +1,12 @@
-module Page.CSM exposing (Model, Msg, init, update, view)
+module Page.CSM exposing (Model, Msg, init, subscriptions, update, view)
 
+import Bootstrap.Button as Button
+import Bootstrap.Form as Form
+import Bootstrap.Form.Select as Select
 import Config exposing (apiServer)
 import Html exposing (Html, div, h1, h2, input, p, table, td, text, th, tr)
 import Html.Attributes exposing (..)
-import Html.Events exposing (..)
+import Html.Events exposing (onInput)
 import Http
 import Json.Decode exposing (Decoder, field, float, int, nullable, string)
 import Json.Decode.Pipeline exposing (hardcoded, optional, required)
@@ -16,6 +19,7 @@ type alias Model =
     , measurements : WebData (List Measurement)
     , tableState : Table.State
     , query : String
+    , selectedMeasurement : Maybe String
     }
 
 
@@ -38,6 +42,7 @@ type Msg
     | MeasurementResponse (WebData (List Measurement))
     | SetQuery String
     | SetTableState Table.State
+    | SelectMeasurement String
 
 
 init : ( Model, Cmd Msg )
@@ -46,6 +51,7 @@ init =
       , measurements = RemoteData.Loading
       , tableState = Table.initialSort "Year"
       , query = ""
+      , selectedMeasurement = Nothing
       }
     , getMeasurements
     )
@@ -55,7 +61,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         MakeRequest ->
-            ( { model | records = RemoteData.Loading }, getData )
+            ( { model | records = RemoteData.Loading }, Cmd.none )
 
         DataResponse data ->
             ( { model | records = data }
@@ -66,6 +72,24 @@ update msg model =
             ( { model | measurements = data }
             , Cmd.none
             )
+
+        SelectMeasurement measurement ->
+            let
+                ( newMeasurement, data ) =
+                    case measurement of
+                        "" ->
+                            ( Nothing, RemoteData.Loading )
+
+                        _ ->
+                            ( Just measurement, RemoteData.Loading )
+
+                newModel =
+                    { model
+                        | selectedMeasurement = newMeasurement
+                        , records = data
+                    }
+            in
+            ( newModel, getData newModel )
 
         SetQuery newQuery ->
             ( { model | query = newQuery }
@@ -82,7 +106,7 @@ view : Model -> Html Msg
 view model =
     div []
         [ h2 [] [ text "Colorado School of Mines Data" ]
-        , viewMeasurements model.measurements
+        , viewMeasurements model
         , viewData model
         ]
 
@@ -122,22 +146,28 @@ viewData model =
                     String.toLower model.query
 
                 filtered =
-                    List.filter (String.contains lowerQuery << String.toLower << .measurement) data
+                    List.filter
+                        (String.contains lowerQuery
+                            << String.toLower
+                            << .measurement
+                        )
+                        data
             in
             div []
-                [ input [ placeholder "Search by Name", onInput SetQuery ] []
+                [ text ("Showing " ++ String.fromInt (List.length data))
+                , input [ placeholder "Search by Name", onInput SetQuery ] []
                 , Table.view tblConfig model.tableState filtered
                 ]
 
 
-viewMeasurements : WebData (List Measurement) -> Html Msg
-viewMeasurements measurements =
+viewMeasurements : Model -> Html Msg
+viewMeasurements model =
     let
         f m =
             text m.measurement
 
         body =
-            case measurements of
+            case model.measurements of
                 RemoteData.NotAsked ->
                     div [] [ text "Not asked" ]
 
@@ -148,11 +178,25 @@ viewMeasurements measurements =
                     div [] [ text (viewHttpErrorMessage httpError) ]
 
                 RemoteData.Success data ->
-                    div [] (List.map f data)
+                    measurementsSelect data
     in
-    div []
-        [ text "Measurements"
-        , body
+    Form.form [] [ body ]
+
+
+measurementsSelect : List Measurement -> Html Msg
+measurementsSelect measurements =
+    let
+        empty =
+            Measurement ""
+
+        makeItem item =
+            Select.item [ value item.measurement ] [ text item.measurement ]
+    in
+    Form.group []
+        [ Form.label [ for "measurement" ] [ text "Measurement" ]
+        , Select.select
+            [ Select.id "myselect", Select.onChange SelectMeasurement ]
+            (List.map makeItem ([ empty ] ++ measurements))
         ]
 
 
@@ -175,17 +219,22 @@ viewHttpErrorMessage httpError =
             message
 
 
-getData : Cmd Msg
-getData =
+getData : Model -> Cmd Msg
+getData model =
     let
         decoder =
             Json.Decode.list dataDecoder
 
-        url =
-            apiServer ++ "/data/csm"
+        selectedParam =
+            case model.selectedMeasurement of
+                Nothing ->
+                    ""
 
-        _ =
-            Debug.log ("url = " ++ url)
+                Just m ->
+                    "measurement=" ++ m
+
+        url =
+            apiServer ++ "/data/csm?" ++ selectedParam
     in
     Http.get
         { url = url
@@ -241,3 +290,8 @@ measurementDecoder : Decoder Measurement
 measurementDecoder =
     Json.Decode.succeed Measurement
         |> Json.Decode.Pipeline.required "measurement" string
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.none

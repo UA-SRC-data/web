@@ -115,8 +115,13 @@ changeRouteTo maybeRoute model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
+subscriptions model =
+    case model.cur_page of
+        CSM subModel ->
+            Sub.map CSMMsg (Page.CSM.subscriptions subModel)
+
+        _ ->
+            Sub.none
 
 
 
