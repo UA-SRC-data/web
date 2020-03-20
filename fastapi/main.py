@@ -3,6 +3,7 @@ import datetime
 from fastapi import FastAPI
 from pymongo import MongoClient
 from starlette.middleware.cors import CORSMiddleware
+from scrutinizer import Variable
 
 app = FastAPI()
 client = MongoClient('mongodb://localhost:27017/')
@@ -105,3 +106,71 @@ def convert_date(date):
 #     coll = db['csm']
 #     f = lambda rec: {k: rec[k] for k in rec if k != '_id'}
 #     return list(map(f, coll.find()))
+
+
+# --------------------------------------------------
+@app.get('/scrutinizer/variables')
+def scrutinizer_variables():
+    """List Scrutinizer variables"""
+
+    # return list(
+    #     map(lambda v: {'variable': v},
+    #         sorted(db['scrutinizer'].distinct('variable'))))
+
+    qry = Variable.select()
+
+    return [{
+        'variable': v.variable,
+        'description': v.description
+    } for v in qry]
+
+
+# --------------------------------------------------
+@app.get('/scrutinizer/measurements')
+def scrutinizer_measurements(variable: str = '',
+                             location_name: str = '',
+                             location_type: str = '',
+                             max_value: float = None,
+                             min_value: float = None,
+                             start_date: str = '',
+                             end_date: str = ''):
+    """List Scrutinizer measurements"""
+
+    coll = db['scrutinizer']
+    qry = {}
+    prj = {
+        'location_name': 1,
+        'location_type': 1,
+        'variable': 1,
+        'value': 1,
+        'collected_on': 1
+    }
+
+    if variable:
+        qry['variable'] = variable
+
+    if location_name:
+        qry['location_name'] = location_name
+
+    if location_type:
+        qry['location_type'] = location_type
+
+    if max_value is not None and min_value is not None:
+        qry['value'] = {'$gte': min_value, '$lte': max_value}
+    elif max_value is not None:
+        qry['value'] = {'$lte': max_value}
+    elif min_value is not None:
+        qry['value'] = {'$gte': min_value}
+
+    start_date = convert_date(start_date)
+    end_date = convert_date(end_date)
+    if start_date and end_date:
+        qry['collection_date'] = {'$gte': start_date, '$lte': end_date}
+    elif start_date:
+        qry['collection_date'] = {'$gte': start_date}
+    elif end_date:
+        qry['collection_date'] = {'$lte': end_date}
+
+    f = lambda rec: {k: rec[k] for k in rec if k != '_id'}
+    print(qry)
+    return list(map(f, coll.find(qry, prj)))

@@ -7,7 +7,9 @@ import Debug
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Page.CSM
+import Page.GardenRoots
 import Page.Home
+import Page.Scrutinizer
 import PageView
 import Route exposing (Route)
 import Url
@@ -36,6 +38,8 @@ main =
 type Page
     = Home
     | CSM Page.CSM.Model
+    | GardenRoots
+    | Scrutinizer Page.Scrutinizer.Model
 
 
 type alias Model =
@@ -61,9 +65,11 @@ init _ url key =
 
 type Msg
     = LinkClicked Browser.UrlRequest
+    | CSMMsg Page.CSM.Msg
+    | GardenRootsMsg
     | NavbarMsg Navbar.State
     | UrlChanged Url.Url
-    | CSMMsg Page.CSM.Msg
+    | ScrutinizerMsg Page.Scrutinizer.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -85,6 +91,13 @@ update msg model =
         ( NavbarMsg state, _ ) ->
             ( { model | navbarState = state }, Cmd.none )
 
+        ( ScrutinizerMsg subMsg, Scrutinizer subModel ) ->
+            let
+                ( newSubModel, newCmd ) =
+                    Page.Scrutinizer.update subMsg subModel
+            in
+            ( { model | cur_page = Scrutinizer newSubModel }, Cmd.map ScrutinizerMsg newCmd )
+
         ( CSMMsg subMsg, CSM subModel ) ->
             let
                 ( newSubModel, newCmd ) =
@@ -99,12 +112,22 @@ update msg model =
 changeRouteTo : Maybe Route -> Model -> ( Model, Cmd Msg )
 changeRouteTo maybeRoute model =
     case maybeRoute of
+        Just Route.Scrutinizer ->
+            let
+                ( subModel, subMsg ) =
+                    Page.Scrutinizer.init
+            in
+            ( { model | cur_page = Scrutinizer subModel }, Cmd.map ScrutinizerMsg subMsg )
+
         Just Route.CSM ->
             let
                 ( subModel, subMsg ) =
                     Page.CSM.init
             in
             ( { model | cur_page = CSM subModel }, Cmd.map CSMMsg subMsg )
+
+        Just Route.GardenRoots ->
+            ( { model | cur_page = GardenRoots }, Cmd.none )
 
         _ ->
             ( { model | cur_page = Home }, Cmd.none )
@@ -117,6 +140,9 @@ changeRouteTo maybeRoute model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.cur_page of
+        Scrutinizer subModel ->
+            Sub.map ScrutinizerMsg (Page.Scrutinizer.subscriptions subModel)
+
         CSM subModel ->
             Sub.map CSMMsg (Page.CSM.subscriptions subModel)
 
@@ -138,5 +164,20 @@ view model =
         Home ->
             PageView.view navConfig model.navbarState Page.Home.view
 
+        GardenRoots ->
+            PageView.view navConfig model.navbarState Page.GardenRoots.view
+
         CSM subModel ->
-            PageView.view navConfig model.navbarState (Html.map CSMMsg (Page.CSM.view subModel))
+            PageView.view navConfig
+                model.navbarState
+                (Html.map CSMMsg (Page.CSM.view subModel))
+
+        Scrutinizer subModel ->
+            PageView.view navConfig
+                model.navbarState
+                (Html.map ScrutinizerMsg (Page.Scrutinizer.view subModel))
+
+
+
+--EJScreen subModel ->
+--    PageView.view navConfig model.navbarState (Html.map EJScreenMsg (Page.EJScreen.view subModel))

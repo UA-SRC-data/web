@@ -10,6 +10,8 @@ import Url.Parser.Query as Query
 
 type Route
     = Home
+    | GardenRoots
+    | Scrutinizer
     | CSM
 
 
@@ -17,6 +19,8 @@ parser : Parser (Route -> a) a
 parser =
     oneOf
         [ Parser.map Home Parser.top
+        , Parser.map GardenRoots (s "gardenroots")
+        , Parser.map Scrutinizer (s "scrutinizer")
         , Parser.map CSM (s "csm")
         ]
 
@@ -56,7 +60,13 @@ routeToString page =
                 Home ->
                     []
 
+                GardenRoots ->
+                    [ "gardenroots" ]
+
                 CSM ->
                     [ "csm" ]
+
+                Scrutinizer ->
+                    [ "scrutinizer" ]
     in
     "#/" ++ String.join "/" pieces
