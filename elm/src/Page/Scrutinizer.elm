@@ -26,8 +26,8 @@ type alias Model =
     , query : String
     , tableState : Table.State
     , variables : WebData (List Variable)
-    , minValue : Maybe Int
-    , maxValue : Maybe Int
+    , minValue : Maybe Float
+    , maxValue : Maybe Float
     , selectedVariable : Maybe String
     }
 
@@ -113,10 +113,10 @@ update msg model =
             ( { model | selectedVariable = newVariable }, Cmd.none )
 
         SetMaxValue max ->
-            ( { model | maxValue = String.toInt max }, Cmd.none )
+            ( { model | maxValue = String.toFloat max }, Cmd.none )
 
         SetMinValue min ->
-            ( { model | minValue = String.toInt min }, Cmd.none )
+            ( { model | minValue = String.toFloat min }, Cmd.none )
 
         SetQuery newQuery ->
             ( { model | query = newQuery }
@@ -299,6 +299,14 @@ getData model =
                 Just n ->
                     String.fromInt n
 
+        maybeToFloat m =
+            case m of
+                Nothing ->
+                    ""
+
+                Just n ->
+                    String.fromFloat n
+
         queryParams =
             Url.Builder.toQuery
                 [ Url.Builder.string
@@ -306,10 +314,10 @@ getData model =
                     (maybeToString model.selectedVariable)
                 , Url.Builder.string
                     "min_value"
-                    (maybeToInt model.minValue)
+                    (maybeToFloat model.minValue)
                 , Url.Builder.string
                     "max_value"
-                    (maybeToInt model.maxValue)
+                    (maybeToFloat model.maxValue)
                 ]
 
         url =

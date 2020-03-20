@@ -155,6 +155,9 @@ def scrutinizer_measurements(variable: str = '',
     if location_type:
         qry['location_type'] = location_type
 
+    print(f'max_value "{max_value}"')
+    print(f'min_value "{min_value}"')
+
     if max_value is not None and min_value is not None:
         qry['value'] = {'$gte': min_value, '$lte': max_value}
     elif max_value is not None:
@@ -176,5 +179,5 @@ def scrutinizer_measurements(variable: str = '',
         new['id'] = str(rec.get('_id'))
         return new
 
-    #print(qry)
+    print(qry)
     return list(map(fix_id, coll.find(qry, prj)))
