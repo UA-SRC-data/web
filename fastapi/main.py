@@ -171,6 +171,10 @@ def scrutinizer_measurements(variable: str = '',
     elif end_date:
         qry['collection_date'] = {'$lte': end_date}
 
-    f = lambda rec: {k: rec[k] for k in rec if k != '_id'}
-    print(qry)
-    return list(map(f, coll.find(qry, prj)))
+    def fix_id(rec):
+        new = {k: rec[k] for k in rec if k != '_id'}
+        new['id'] = str(rec.get('_id'))
+        return new
+
+    #print(qry)
+    return list(map(fix_id, coll.find(qry, prj)))
