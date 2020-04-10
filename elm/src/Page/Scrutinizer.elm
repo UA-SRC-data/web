@@ -307,18 +307,21 @@ getData model =
                 Just n ->
                     String.fromFloat n
 
+        builder ( label, value ) =
+            case value of
+                Just v ->
+                    Just (Url.Builder.string label v)
+
+                _ ->
+                    Nothing
+
         queryParams =
-            Url.Builder.toQuery
-                [ Url.Builder.string
-                    "variable"
-                    (maybeToString model.selectedVariable)
-                , Url.Builder.string
-                    "min_value"
-                    (maybeToFloat model.minValue)
-                , Url.Builder.string
-                    "max_value"
-                    (maybeToFloat model.maxValue)
-                ]
+            Url.Builder.toQuery <|
+                List.filterMap builder
+                    [ ( "variable", model.selectedVariable )
+                    , ( "min_value", Maybe.map String.fromFloat model.minValue )
+                    , ( "max_value", Maybe.map String.fromFloat model.maxValue )
+                    ]
 
         url =
             apiServer ++ "/scrutinizer/measurements" ++ queryParams
