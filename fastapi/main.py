@@ -5,12 +5,14 @@ from pymongo import MongoClient
 from starlette.middleware.cors import CORSMiddleware
 from scrutinizer import Variable
 
-app = FastAPI()
+#app = FastAPI()
+app = FastAPI(openapi_prefix="/api/v1")
 client = MongoClient('mongodb://localhost:27017/')
 db = client['uasrc']
 
 origins = [
     "http://localhost:*",
+    "http://src.cals.arizona.edu:*",
     "*",
 ]
 
@@ -21,6 +23,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+#app.mount("/api/v1", subapi)
 
 
 # --------------------------------------------------
@@ -90,25 +94,6 @@ def csm(measurement: str = '',
 
 
 # --------------------------------------------------
-def convert_date(date):
-    """Convert a date"""
-
-    if date:
-        dt = dateparser.parse(date)
-        if dt:
-            return datetime.datetime.utcfromtimestamp(dt.timestamp())
-
-
-# @app.get('/data/census')
-# def csm():
-#     """List CSM"""
-
-#     coll = db['csm']
-#     f = lambda rec: {k: rec[k] for k in rec if k != '_id'}
-#     return list(map(f, coll.find()))
-
-
-# --------------------------------------------------
 @app.get('/scrutinizer/variables')
 def scrutinizer_variables():
     """List Scrutinizer variables"""
@@ -155,9 +140,6 @@ def scrutinizer_measurements(variable: str = '',
     if location_type:
         qry['location_type'] = location_type
 
-    print(f'max_value "{max_value}"')
-    print(f'min_value "{min_value}"')
-
     if max_value is not None and min_value is not None:
         qry['value'] = {'$gte': min_value, '$lte': max_value}
     elif max_value is not None:
@@ -179,5 +161,25 @@ def scrutinizer_measurements(variable: str = '',
         new['id'] = str(rec.get('_id'))
         return new
 
-    print(qry)
+    #print(qry)
     return list(map(fix_id, coll.find(qry, prj)))
+
+# --------------------------------------------------
+def convert_date(date):
+    """Convert a date"""
+
+    if date:
+        dt = dateparser.parse(date)
+        if dt:
+            return datetime.datetime.utcfromtimestamp(dt.timestamp())
+
+
+# @app.get('/data/census')
+# def csm():
+#     """List CSM"""
+
+#     coll = db['csm']
+#     f = lambda rec: {k: rec[k] for k in rec if k != '_id'}
+#     return list(map(f, coll.find()))
+
+

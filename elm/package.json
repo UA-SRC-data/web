@@ -4,7 +4,7 @@
   "description": "UA SRC Elm SPA",
   "main": "index.js",
   "scripts": {
-    "start": "elm-live src/Main.elm --port 8080 --start-page=index.html -- --output=index.js", 
+    "start": "elm-live src/Main.elm --port 8080 --start-page=index.html -- --output=index.js",
     "start_parcel": "parcel index.html",
     "build": "parcel build index.html",
     "test": "elm-test"
@@ -24,5 +24,8 @@
     "elm-hot": "^1.1.2",
     "node-elm-compiler": "^5.0.4",
     "parcel-bundler": "^1.12.4"
+  },
+  "dependencies": {
+    "elm-live": "^4.0.2"
   }
 }
