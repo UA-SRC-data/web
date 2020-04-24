@@ -143,6 +143,7 @@ def scrutinizer_measurements(variable: str = '',
         'location_type': 1,
         'variable': 1,
         'value': 1,
+        'medium': 1,
         'collected_on': 1
     }
 
