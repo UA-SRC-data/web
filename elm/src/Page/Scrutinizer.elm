@@ -44,6 +44,7 @@ type alias Record =
     , location_name : String
     , location_type : String
     , collected_on : String
+    , medium : String
     , value : Float
     }
 
@@ -233,9 +234,9 @@ variableSelect variables =
                     Variable "" "--Choose--"
 
                 display item =
-                    case String.length item.variable of
+                    case String.length item.description of
                         0 ->
-                            item.description
+                            item.variable
 
                         _ ->
                             item.description
@@ -357,6 +358,7 @@ tblConfig =
             [ Table.stringColumn "Variable" .variable
             , Table.stringColumn "Location" .location_name
             , Table.stringColumn "Location Type" .location_type
+            , Table.stringColumn "Medium" .medium
             , Table.stringColumn "Collected" .collected_on
             , Table.floatColumn "Value" .value
             ]
@@ -380,6 +382,7 @@ decoderData =
         |> Json.Decode.Pipeline.required "location_name" string
         |> Json.Decode.Pipeline.required "location_type" string
         |> Json.Decode.Pipeline.required "collected_on" string
+        |> Json.Decode.Pipeline.required "medium" string
         |> Json.Decode.Pipeline.required "value" float
 
 
