@@ -28,6 +28,7 @@ type alias Model =
     , variables : WebData (List Variable)
     , minValue : Maybe Float
     , maxValue : Maybe Float
+    , locationType : Maybe String
     , selectedVariable : Maybe String
     }
 
@@ -59,6 +60,7 @@ type Msg
     | SetTableState Table.State
     | SetMinValue String
     | SetMaxValue String
+    | SetLocationType String
 
 
 init : ( Model, Cmd Msg )
@@ -68,6 +70,7 @@ init =
       , query = ""
       , minValue = Nothing
       , maxValue = Nothing
+      , locationType = Nothing
       , variables = RemoteData.NotAsked
       , selectedVariable = Nothing
       }
@@ -118,6 +121,17 @@ update msg model =
 
         SetMinValue min ->
             ( { model | minValue = String.toFloat min }, Cmd.none )
+
+        SetLocationType newType ->
+            let
+                newVal =
+                    if String.length newType == 0 then
+                        Nothing
+
+                    else
+                        Just newType
+            in
+            ( { model | locationType = newVal }, Cmd.none )
 
         SetQuery newQuery ->
             ( { model | query = newQuery }
@@ -186,8 +200,9 @@ viewForm model =
     in
     Form.form []
         [ variableSelect model.variables
-        , countMin
-        , countMax
+        , locationTypeSelect
+        , countMinInput
+        , countMaxInput
         , Button.button
             [ Button.onClick MakeRequest
             , Button.primary
@@ -200,19 +215,27 @@ viewForm model =
         ]
 
 
-countMin : Html Msg
-countMin =
+countMinInput : Html Msg
+countMinInput =
     Form.group []
         [ Form.label [ for "min_value" ] [ text "Min Value" ]
         , Input.number [ Input.onInput SetMinValue ]
         ]
 
 
-countMax : Html Msg
-countMax =
+countMaxInput : Html Msg
+countMaxInput =
     Form.group []
         [ Form.label [ for "max_value" ] [ text "Max Value" ]
         , Input.number [ Input.onInput SetMaxValue ]
+        ]
+
+
+locationTypeSelect : Html Msg
+locationTypeSelect =
+    Form.group []
+        [ Form.label [ for "location_type" ] [ text "Location Type" ]
+        , Input.text [ Input.onInput SetLocationType ]
         ]
 
 
@@ -322,6 +345,7 @@ getData model =
                     [ ( "variable", model.selectedVariable )
                     , ( "min_value", Maybe.map String.fromFloat model.minValue )
                     , ( "max_value", Maybe.map String.fromFloat model.maxValue )
+                    , ( "location_type", model.locationType )
                     ]
 
         url =
