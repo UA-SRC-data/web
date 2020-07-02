@@ -19,44 +19,44 @@ import Url.Builder
 
 type alias Model =
     { records : WebData (List Record)
-    , measurements : WebData (List Measurement)
-    , stations : WebData (List Station)
+    , variables : WebData (List Variable)
+    , locations : WebData (List Location)
     , tableState : Table.State
     , query : String
-    , selectedMeasurement : Maybe String
-    , selectedStation : Maybe String
-    , minValue : Maybe Int
-    , maxValue : Maybe Int
+    , selectedVariable : Maybe String
+    , selectedLocation : Maybe String
+    , minValue : Maybe Float
+    , maxValue : Maybe Float
     }
 
 
-type alias Measurement =
-    { measurement : String
+type alias Variable =
+    { variable_name : String
     }
 
 
-type alias Station =
-    { station : String
+type alias Location =
+    { location_name : String
     }
 
 
 type alias Record =
-    { collection_date : String
-    , measurement : String
-    , station : String
-    , val : Float
+    { collected_on : String
+    , variable_name : String
+    , location_name : String
+    , value : Float
     }
 
 
 type Msg
     = MakeRequest
     | DataResponse (WebData (List Record))
-    | MeasurementsResponse (WebData (List Measurement))
-    | StationsResponse (WebData (List Station))
+    | VariablesResponse (WebData (List Variable))
+    | LocationsResponse (WebData (List Location))
     | SetQuery String
     | SetTableState Table.State
-    | SelectMeasurement String
-    | SelectStation String
+    | SelectVariable String
+    | SelectLocation String
     | SetMinValue String
     | SetMaxValue String
 
@@ -64,17 +64,17 @@ type Msg
 init : ( Model, Cmd Msg )
 init =
     ( { records = RemoteData.NotAsked
-      , measurements = RemoteData.NotAsked
-      , stations = RemoteData.NotAsked
+      , variables = RemoteData.NotAsked
+      , locations = RemoteData.NotAsked
       , tableState = Table.initialSort "Year"
       , query = ""
-      , selectedMeasurement = Nothing
-      , selectedStation = Nothing
+      , selectedVariable = Nothing
+      , selectedLocation = Nothing
       , minValue = Nothing
       , maxValue = Nothing
       }
     , Cmd.batch
-        [ getMeasurements, getStations ]
+        [ getVariables, getLocations ]
     )
 
 
@@ -89,45 +89,45 @@ update msg model =
             , Cmd.none
             )
 
-        MeasurementsResponse data ->
-            ( { model | measurements = data }
+        VariablesResponse data ->
+            ( { model | variables = data }
             , Cmd.none
             )
 
-        StationsResponse data ->
-            ( { model | stations = data }
+        LocationsResponse data ->
+            ( { model | locations = data }
             , Cmd.none
             )
 
-        SelectMeasurement measurement ->
+        SelectVariable variable ->
             let
-                newMeasurement =
-                    case measurement of
+                newVariable =
+                    case variable of
                         "" ->
                             Nothing
 
                         _ ->
-                            Just measurement
+                            Just variable
             in
-            ( { model | selectedMeasurement = newMeasurement }, Cmd.none )
+            ( { model | selectedVariable = newVariable }, Cmd.none )
 
-        SelectStation station ->
+        SelectLocation location ->
             let
-                newStation =
-                    case station of
+                newLocation =
+                    case location of
                         "" ->
                             Nothing
 
                         _ ->
-                            Just station
+                            Just location
             in
-            ( { model | selectedStation = newStation }, Cmd.none )
+            ( { model | selectedLocation = newLocation }, Cmd.none )
 
         SetMaxValue max ->
-            ( { model | maxValue = String.toInt max }, Cmd.none )
+            ( { model | maxValue = String.toFloat max }, Cmd.none )
 
         SetMinValue min ->
-            ( { model | minValue = String.toInt min }, Cmd.none )
+            ( { model | minValue = String.toFloat min }, Cmd.none )
 
         SetQuery newQuery ->
             ( { model | query = newQuery }
@@ -165,9 +165,9 @@ viewData model =
             let
                 viewRec rec =
                     tr []
-                        [ td [] [ text rec.collection_date ]
-                        , td [] [ text rec.measurement ]
-                        , td [] [ text rec.station ]
+                        [ td [] [ text rec.collected_on ]
+                        , td [] [ text rec.variable_name ]
+                        , td [] [ text rec.location_name ]
                         , td [ style "text-align" "right" ]
                             [ text (String.fromFloat rec.val) ]
                         ]
@@ -175,8 +175,8 @@ viewData model =
                 header =
                     tr []
                         [ th [] [ text "Collected" ]
-                        , th [] [ text "Measurement" ]
-                        , th [] [ text "Station" ]
+                        , th [] [ text "Variable" ]
+                        , th [] [ text "Location" ]
                         , th [] [ text "Value" ]
                         ]
 
@@ -187,7 +187,7 @@ viewData model =
                     List.filter
                         (String.contains lowerQuery
                             << String.toLower
-                            << .measurement
+                            << .variable_name
                         )
                         data
             in
@@ -200,8 +200,8 @@ viewData model =
 viewForm : Model -> Html Msg
 viewForm model =
     Form.form []
-        [ measurementsSelect model.measurements
-        , stationsSelect model.stations
+        [ variablesSelect model.variables
+        , locationsSelect model.locations
         , countMin
         , countMax
         , Button.button
@@ -228,9 +228,9 @@ countMax =
         ]
 
 
-measurementsSelect : WebData (List Measurement) -> Html Msg
-measurementsSelect measurements =
-    case measurements of
+variablesSelect : WebData (List Variable) -> Html Msg
+variablesSelect variables =
+    case variables of
         RemoteData.NotAsked ->
             div [] [ text "Not asked" ]
 
@@ -243,26 +243,26 @@ measurementsSelect measurements =
         RemoteData.Success data ->
             let
                 empty =
-                    Measurement ""
+                    Variable ""
 
                 makeItem item =
                     Select.item
-                        [ value item.measurement ]
-                        [ text item.measurement ]
+                        [ value item.variable_name ]
+                        [ text item.variable_name ]
             in
             Form.group []
-                [ Form.label [ for "measurement" ] [ text "Measurement" ]
+                [ Form.label [ for "variable" ] [ text "Variable" ]
                 , Select.select
-                    [ Select.id "measurements"
-                    , Select.onChange SelectMeasurement
+                    [ Select.id "variables"
+                    , Select.onChange SelectVariable
                     ]
                     (List.map makeItem ([ empty ] ++ data))
                 ]
 
 
-stationsSelect : WebData (List Station) -> Html Msg
-stationsSelect stations =
-    case stations of
+locationsSelect : WebData (List Location) -> Html Msg
+locationsSelect locations =
+    case locations of
         RemoteData.NotAsked ->
             div [] [ text "Not asked" ]
 
@@ -275,17 +275,17 @@ stationsSelect stations =
         RemoteData.Success data ->
             let
                 empty =
-                    Station ""
+                    Location ""
 
                 makeItem item =
                     Select.item
-                        [ value item.station ]
-                        [ text item.station ]
+                        [ value item.location_name ]
+                        [ text item.location_name ]
             in
             Form.group []
-                [ Form.label [ for "station" ] [ text "Station" ]
+                [ Form.label [ for "location" ] [ text "Location" ]
                 , Select.select
-                    [ Select.id "stations", Select.onChange SelectStation ]
+                    [ Select.id "locations", Select.onChange SelectLocation ]
                     (List.map makeItem ([ empty ] ++ data))
                 ]
 
@@ -328,21 +328,22 @@ getData model =
                 Just n ->
                     String.fromInt n
 
+        builder ( label, value ) =
+            case value of
+                Just v ->
+                    Just (Url.Builder.string label v)
+
+                _ ->
+                    Nothing
+
         queryParams =
-            Url.Builder.toQuery
-                [ Url.Builder.string
-                    "measurement"
-                    (maybeToString model.selectedMeasurement)
-                , Url.Builder.string
-                    "station"
-                    (maybeToString model.selectedStation)
-                , Url.Builder.string
-                    "val_min"
-                    (maybeToInt model.minValue)
-                , Url.Builder.string
-                    "val_max"
-                    (maybeToInt model.maxValue)
-                ]
+            Url.Builder.toQuery <|
+                List.filterMap builder
+                    [ ( "variable_name", model.selectedVariable )
+                    , ( "location_name", model.selectedLocation )
+                    , ( "val_min", Maybe.map String.fromFloat model.minValue )
+                    , ( "val_max", Maybe.map String.fromFloat model.maxValue )
+                    ]
 
         url =
             apiServer ++ "/data/csm" ++ queryParams
@@ -356,46 +357,46 @@ getData model =
         |> HttpBuilder.request
 
 
-getMeasurements : Cmd Msg
-getMeasurements =
+getVariables : Cmd Msg
+getVariables =
     let
         url =
-            apiServer ++ "/data/csm/measurements"
+            apiServer ++ "/data/csm/variables"
     in
     Http.get
         { url = url
         , expect =
             Http.expectJson
-                (RemoteData.fromResult >> MeasurementsResponse)
-                (Json.Decode.list decoderMeasurement)
+                (RemoteData.fromResult >> VariablesResponse)
+                (Json.Decode.list decoderVariable)
         }
 
 
-getStations : Cmd Msg
-getStations =
+getLocations : Cmd Msg
+getLocations =
     let
         url =
-            apiServer ++ "/data/csm/stations"
+            apiServer ++ "/data/csm/locations"
     in
     Http.get
         { url = url
         , expect =
             Http.expectJson
-                (RemoteData.fromResult >> StationsResponse)
-                (Json.Decode.list decoderStation)
+                (RemoteData.fromResult >> LocationsResponse)
+                (Json.Decode.list decoderLocation)
         }
 
 
 tblConfig : Table.Config Record Msg
 tblConfig =
     Table.config
-        { toId = .station
+        { toId = .location_name
         , toMsg = SetTableState
         , columns =
-            [ Table.stringColumn "Collected" .collection_date
-            , Table.stringColumn "Measurement" .measurement
-            , Table.stringColumn "Station" .station
-            , Table.floatColumn "Value" .val
+            [ Table.stringColumn "Collected" .collected_on
+            , Table.stringColumn "Variable" .variable_name
+            , Table.stringColumn "Location" .location_name
+            , Table.floatColumn "Value" .value
             ]
         }
 
@@ -403,22 +404,22 @@ tblConfig =
 decoderData : Decoder Record
 decoderData =
     Json.Decode.succeed Record
-        |> Json.Decode.Pipeline.required "collection_date" string
-        |> Json.Decode.Pipeline.required "measurement" string
-        |> Json.Decode.Pipeline.required "station" string
-        |> Json.Decode.Pipeline.required "val" float
+        |> Json.Decode.Pipeline.required "collected_on" string
+        |> Json.Decode.Pipeline.required "variable_name" string
+        |> Json.Decode.Pipeline.required "location_name" string
+        |> Json.Decode.Pipeline.required "value" float
 
 
-decoderMeasurement : Decoder Measurement
-decoderMeasurement =
-    Json.Decode.succeed Measurement
-        |> Json.Decode.Pipeline.required "measurement" string
+decoderVariable : Decoder Variable
+decoderVariable =
+    Json.Decode.succeed Variable
+        |> Json.Decode.Pipeline.required "variable_name" string
 
 
-decoderStation : Decoder Station
-decoderStation =
-    Json.Decode.succeed Station
-        |> Json.Decode.Pipeline.required "station" string
+decoderLocation : Decoder Location
+decoderLocation =
+    Json.Decode.succeed Location
+        |> Json.Decode.Pipeline.required "location_name" string
 
 
 subscriptions : Model -> Sub Msg

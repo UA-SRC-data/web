@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from pymongo import MongoClient
 from starlette.middleware.cors import CORSMiddleware
 from scrutinizer import Variable
+from typing import Optional
 
 app = FastAPI()
 client = MongoClient('mongodb://localhost:27017/')
@@ -24,66 +25,66 @@ app.add_middleware(
 
 
 # --------------------------------------------------
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
-
-
-# --------------------------------------------------
-@app.get('/data/csm/measurements')
+@app.get('/data/csm/variables')
 def csm_measurements():
     """List CSM measurements"""
 
     return list(
-        map(lambda m: {'measurement': m},
-            sorted(db['csm'].distinct('measurement'))))
+        map(lambda m: {'variable_name': m},
+            sorted(db['csm'].distinct('variable_name'))))
 
 
 # --------------------------------------------------
-@app.get('/data/csm/stations')
+@app.get('/data/csm/locations')
 def csm_stations():
-    """List CSM stations"""
+    """List CSM locations/stations"""
 
     return list(
-        map(lambda s: {'station': s}, sorted(db['csm'].distinct('station'))))
+        map(lambda s: {'location_name': s},
+            sorted(db['csm'].distinct('location_name'))))
 
 
 # --------------------------------------------------
 @app.get('/data/csm')
-def csm(measurement: str = '',
-        station: str = '',
+def csm(variable_name: str = '',
+        location_name: str = '',
         start_date: str = '',
         end_date: str = '',
-        val_max: float = None,
-        val_min: float = None):
+        val_max: Optional[float] = None,
+        val_min: Optional[float] = None):
     """List CSM"""
 
     coll = db['csm']
 
     qry = {}
-    prj = {'station': 1, 'measurement': 1, 'collection_date': 1, 'val': 1}
+    prj = {
+        'location_name': 1,
+        'variable_name': 1,
+        'collected_on': 1,
+        'value': 1
+    }
 
-    if measurement:
-        qry['measurement'] = measurement
+    if variable_name:
+        qry['variable_name'] = variable_name
 
-    if station:
-        qry['station'] = station
+    if location_name:
+        qry['location_name'] = location_name
 
     start_date = convert_date(start_date)
     end_date = convert_date(end_date)
     if start_date and end_date:
-        qry['collection_date'] = {'$gte': start_date, '$lte': end_date}
+        qry['collected_on'] = {'$gte': start_date, '$lte': end_date}
     elif start_date:
-        qry['collection_date'] = {'$gte': start_date}
+        qry['collected_on'] = {'$gte': start_date}
     elif end_date:
-        qry['collection_date'] = {'$lte': end_date}
+        qry['collected_on'] = {'$lte': end_date}
 
     if val_max is not None and val_min is not None:
-        qry['val'] = {'$gte': val_min, '$lte': val_max}
+        qry['value'] = {'$gte': val_min, '$lte': val_max}
     elif val_max is not None:
-        qry['val'] = {'$lte': val_max}
+        qry['value'] = {'$lte': val_max}
     elif val_min is not None:
-        qry['val'] = {'$gte': val_min}
+        qry['value'] = {'$gte': val_min}
 
     f = lambda rec: {k: rec[k] for k in rec if k != '_id'}
     return list(map(f, coll.find(qry, prj)))
@@ -97,15 +98,6 @@ def convert_date(date):
         dt = dateparser.parse(date)
         if dt:
             return datetime.datetime.utcfromtimestamp(dt.timestamp())
-
-
-# @app.get('/data/census')
-# def csm():
-#     """List CSM"""
-
-#     coll = db['csm']
-#     f = lambda rec: {k: rec[k] for k in rec if k != '_id'}
-#     return list(map(f, coll.find()))
 
 
 # --------------------------------------------------
@@ -156,8 +148,8 @@ def scrutinizer_measurements(variable: str = '',
     if location_type:
         qry['location_type'] = location_type
 
-    print(f'max_value "{max_value}"')
-    print(f'min_value "{min_value}"')
+    #print(f'max_value "{max_value}"')
+    #print(f'min_value "{min_value}"')
 
     if max_value is not None and min_value is not None:
         qry['value'] = {'$gte': min_value, '$lte': max_value}
@@ -180,5 +172,5 @@ def scrutinizer_measurements(variable: str = '',
         new['id'] = str(rec.get('_id'))
         return new
 
-    print(qry)
+    #print(qry)
     return list(map(fix_id, coll.find(qry, prj)))
