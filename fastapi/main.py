@@ -29,9 +29,16 @@ app.add_middleware(
 def csm_measurements():
     """List CSM measurements"""
 
+    # return list(
+    #     map(lambda m: {'variable_name': m},
+    #         sorted(db['csm'].distinct('variable_name'))))
+
+    f = lambda rec: {k: rec[k] for k in rec if k != '_id'}
     return list(
-        map(lambda m: {'variable_name': m},
-            sorted(db['csm'].distinct('variable_name'))))
+        map(f, db['csm_variables'].find({}, {
+            'name': 1,
+            'desc': 1
+        }).sort('name')))
 
 
 # --------------------------------------------------
@@ -109,13 +116,19 @@ def scrutinizer_variables():
     #     map(lambda v: {'variable': v},
     #         sorted(db['scrutinizer'].distinct('variable'))))
 
-    qry = Variable.select()
+    # qry = Variable.select()
 
-    return [{
-        'variable': v.variable,
-        'description': v.description
-    } for v in qry]
+    # return [{
+    #     'variable': v.variable,
+    #     'description': v.description
+    # } for v in qry]
 
+    f = lambda rec: {k: rec[k] for k in rec if k != '_id'}
+    return list(
+        map(f, db['variables'].find({}, {
+            'name': 1,
+            'desc': 1
+        }).sort('name')))
 
 # --------------------------------------------------
 @app.get('/scrutinizer/measurements')
@@ -133,14 +146,15 @@ def scrutinizer_measurements(variable: str = '',
     prj = {
         'location_name': 1,
         'location_type': 1,
-        'variable': 1,
+        'variable_name': 1,
+        'variable_desc': 1,
         'value': 1,
         'medium': 1,
         'collected_on': 1
     }
 
     if variable:
-        qry['variable'] = variable
+        qry['variable_name'] = variable
 
     if location_name:
         qry['location_name'] = location_name

@@ -32,6 +32,7 @@ type alias Model =
 
 type alias Variable =
     { variable_name : String
+    , variable_desc : String
     }
 
 
@@ -243,12 +244,15 @@ variablesSelect variables =
         RemoteData.Success data ->
             let
                 empty =
-                    Variable ""
+                    Variable "" "--Choose--"
+
+                display name desc =
+                    text (name ++ " (" ++ desc ++ ")")
 
                 makeItem item =
                     Select.item
                         [ value item.variable_name ]
-                        [ text item.variable_name ]
+                        [ display item.variable_name item.variable_desc ]
             in
             Form.group []
                 [ Form.label [ for "variable" ] [ text "Variable" ]
@@ -413,7 +417,8 @@ decoderData =
 decoderVariable : Decoder Variable
 decoderVariable =
     Json.Decode.succeed Variable
-        |> Json.Decode.Pipeline.required "variable_name" string
+        |> Json.Decode.Pipeline.required "name" string
+        |> Json.Decode.Pipeline.required "desc" string
 
 
 decoderLocation : Decoder Location

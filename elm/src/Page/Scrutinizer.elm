@@ -41,7 +41,8 @@ type alias Variable =
 
 type alias Record =
     { id : String
-    , variable : String
+    , variable_name : String
+    , variable_desc : String
     , location_name : String
     , location_type : String
     , collected_on : String
@@ -379,7 +380,8 @@ tblConfig : Table.Config Record Msg
 tblConfig =
     Table.customConfig
         { columns =
-            [ Table.stringColumn "Variable" .variable
+            [ Table.stringColumn "Variable" .variable_name
+            , Table.stringColumn "Desc" .variable_desc
             , Table.stringColumn "Location" .location_name
             , Table.stringColumn "Location Type" .location_type
             , Table.stringColumn "Medium" .medium
@@ -402,7 +404,8 @@ decoderData : Decoder Record
 decoderData =
     Json.Decode.succeed Record
         |> Json.Decode.Pipeline.required "id" string
-        |> Json.Decode.Pipeline.required "variable" string
+        |> Json.Decode.Pipeline.required "variable_name" string
+        |> Json.Decode.Pipeline.optional "variable_desc" string ""
         |> Json.Decode.Pipeline.required "location_name" string
         |> Json.Decode.Pipeline.required "location_type" string
         |> Json.Decode.Pipeline.required "collected_on" string
@@ -413,8 +416,8 @@ decoderData =
 decoderVariable : Decoder Variable
 decoderVariable =
     Json.Decode.succeed Variable
-        |> Json.Decode.Pipeline.required "variable" string
-        |> Json.Decode.Pipeline.optional "description" string ""
+        |> Json.Decode.Pipeline.required "name" string
+        |> Json.Decode.Pipeline.optional "desc" string ""
 
 
 subscriptions : Model -> Sub Msg
