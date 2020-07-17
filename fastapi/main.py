@@ -6,7 +6,12 @@ from starlette.middleware.cors import CORSMiddleware
 from scrutinizer import Variable
 from typing import Optional
 
-app = FastAPI()
+# developing locally
+# app = FastAPI() 
+
+# running on UA VM
+app = FastAPI(openapi_prefix="/api/v1")
+
 client = MongoClient('mongodb://localhost:27017/')
 db = client['uasrc']
 
