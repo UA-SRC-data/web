@@ -36,6 +36,8 @@ type alias Model =
 type alias Variable =
     { variable : String
     , description : String
+    , source : String
+    , unit : String
     }
 
 
@@ -48,6 +50,8 @@ type alias Record =
     , collected_on : String
     , medium : String
     , value : Float
+    , source : String
+    , unit : String
     }
 
 
@@ -255,12 +259,12 @@ variableSelect variables =
         RemoteData.Success data ->
             let
                 empty =
-                    Variable "" "--Choose--"
+                    Variable "" "--Choose--" "" ""
 
                 display item =
-                    case String.length item.description of
+                    case String.length item.variable of
                         0 ->
-                            item.variable
+                            item.description
 
                         _ ->
                             item.description
@@ -411,6 +415,8 @@ decoderData =
         |> Json.Decode.Pipeline.required "collected_on" string
         |> Json.Decode.Pipeline.required "medium" string
         |> Json.Decode.Pipeline.required "value" float
+        |> Json.Decode.Pipeline.optional "source" string ""
+        |> Json.Decode.Pipeline.optional "unit" string ""
 
 
 decoderVariable : Decoder Variable
@@ -418,6 +424,8 @@ decoderVariable =
     Json.Decode.succeed Variable
         |> Json.Decode.Pipeline.required "name" string
         |> Json.Decode.Pipeline.optional "desc" string ""
+        |> Json.Decode.Pipeline.optional "source" string ""
+        |> Json.Decode.Pipeline.optional "unit" string ""
 
 
 subscriptions : Model -> Sub Msg

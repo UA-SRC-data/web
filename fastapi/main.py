@@ -112,23 +112,16 @@ def convert_date(date):
 def scrutinizer_variables():
     """List Scrutinizer variables"""
 
-    # return list(
-    #     map(lambda v: {'variable': v},
-    #         sorted(db['scrutinizer'].distinct('variable'))))
-
-    # qry = Variable.select()
-
-    # return [{
-    #     'variable': v.variable,
-    #     'description': v.description
-    # } for v in qry]
-
     f = lambda rec: {k: rec[k] for k in rec if k != '_id'}
     return list(
-        map(f, db['variables'].find({}, {
-            'name': 1,
-            'desc': 1
-        }).sort('name')))
+        map(
+            f, db['variables'].find({}, {
+                'name': 1,
+                'desc': 1,
+                'source': 1,
+                'unit': 1
+            }).sort('name')))
+
 
 # --------------------------------------------------
 @app.get('/scrutinizer/measurements')
@@ -150,7 +143,9 @@ def scrutinizer_measurements(variable: str = '',
         'variable_desc': 1,
         'value': 1,
         'medium': 1,
-        'collected_on': 1
+        'collected_on': 1,
+        'source': 1,
+        'unit': 1
     }
 
     if variable:
@@ -186,5 +181,5 @@ def scrutinizer_measurements(variable: str = '',
         new['id'] = str(rec.get('_id'))
         return new
 
-    #print(qry)
+    print(qry)
     return list(map(fix_id, coll.find(qry, prj)))
